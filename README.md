@@ -65,7 +65,7 @@ ai-chatbot/
 
 ## How to run
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/HaseebKundi/Ai-Chatbot
 cd ai-chatbot
 pip install -r requirements.txt
 copy .env.example .env      # Windows   (Mac/Linux: cp .env.example .env)
