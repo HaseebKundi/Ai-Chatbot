@@ -83,7 +83,7 @@ pytest
 ```
 
 ## Screenshots
-![Chat demo](screenshot.png)
+   ![Chat demo](screenshot.png.jpeg)
 
 ## What I learned
 - How chat APIs work: a list of messages with `system`, `user`, `assistant` roles
