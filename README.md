@@ -1,53 +1,108 @@
-# Basic AI Chatbot
+# Nova - AI Chatbot (Groq)
 
-## What I built
-A simple command-line chatbot. The user types a message, the program sends it
-to an AI model on Groq, receives the reply, and prints it in the terminal.
+A terminal AI chatbot with a defined personality ("Nova", a friendly mentor for
+beginners), conversation memory, a loading spinner, Markdown rendering, input
+validation and production-style error handling.
+
+## Features
+**Day 2**
+- User input -> AI response, via the Groq API
+- System prompt defining role, style and rules (`chatbot_app/prompts.py`)
+- Loading state (spinner while waiting for the model)
+- Error handling for invalid key, retired model, rate limits, timeouts, no internet
+- Clean terminal interface (panels, colors)
+
+**Day 3 improvements**
+- Conversation history / context memory (limited to the last N messages)
+- `/clear` command to reset the conversation
+- Input validation (empty or too-long messages)
+- Markdown rendering of AI answers (code blocks, lists, bold)
+- Better prompt structure (Role / Style / Rules sections)
+
+**Production-oriented extras**
+- Modular code, one responsibility per file
+- All settings in `.env` (model, timeout, retries, history size, limits)
+- Automatic retries and request timeout
+- Failed requests roll back the history so the chat stays consistent
+- Logging to `chatbot.log` (never logs messages or the API key)
+- Unit tests with pytest
 
 ## Technology used
-- Python 3
-- Groq API (free tier) via the official `groq` SDK, model `llama-3.3-70b-versatile`
-- `python-dotenv` for loading the API key from a `.env` file
+Python 3.10+, Groq API (`groq` SDK), `python-dotenv`, `rich`, `pytest`
+
+## Project structure
+```
+ai-chatbot/
+├── chatbot.py              # entry point
+├── chatbot_app/
+│   ├── cli.py              # main loop, commands, wires everything together
+│   ├── client.py           # ONLY file that calls the API; maps errors to friendly messages
+│   ├── conversation.py     # history/memory, trimming, clear, rollback
+│   ├── config.py           # settings loaded from .env
+│   ├── prompts.py          # system prompt
+│   ├── validation.py       # input validation
+│   └── ui.py               # terminal UI (spinner, markdown, panels)
+├── tests/                  # pytest unit tests
+├── requirements.txt
+├── requirements-dev.txt
+├── .env.example
+└── .gitignore
+```
+
+## Architecture
+```
+ You ──> ui.prompt() ──> validation ──> Conversation (history + system prompt)
+                                              │
+                                              ▼
+ ui.show_reply() <── ChatClient (Groq API, retries, timeout, error mapping)
+```
+1. `cli.py` reads input and handles commands (`/clear`, `/help`, `/exit`).
+2. `validation.py` rejects empty or too-long messages.
+3. `conversation.py` adds the message and builds `[system prompt + recent history]`.
+4. `client.py` sends it to Groq. Any API failure becomes a friendly `ChatError`.
+5. On success the reply is stored in history and rendered as Markdown.
+   On failure the user message is rolled back, so history never gets corrupted.
 
 ## How to run
-1. Get a free API key at https://console.groq.com/keys
-2. Clone the repo and enter the folder:
-   ```bash
-   git clone <your-repo-url>
-   cd ai-chatbot
-   ```
-3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-4. Create your `.env` file from the example and add your key:
-   ```bash
-   cp .env.example .env
-   # then edit .env and set GROQ_API_KEY=...
-   ```
-5. Start the chatbot:
-   ```bash
-   python chatbot.py
-   ```
-6. Type a message and press Enter. Type `quit` to exit.
+```bash
+git clone <your-repo-url>
+cd ai-chatbot
+pip install -r requirements.txt
+copy .env.example .env      # Windows   (Mac/Linux: cp .env.example .env)
+```
+Edit `.env` and set `GROQ_API_KEY` (free key: https://console.groq.com/keys), then:
+```bash
+python chatbot.py
+```
+Commands: `/clear` new conversation, `/help`, `/exit`.
 
-## API integration approach
-1. The API key is read from `.env` (never committed; `.env` is in `.gitignore`).
-2. `ask_ai()` calls `client.chat.completions.create()` with the model and the
-   user's message as a single `user` turn.
-3. The text in `response.choices[0].message.content` is returned and printed.
+Run the tests:
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
 
-## How it works (short explanation)
-`input()` reads the user's message -> `ask_ai()` sends it to the Groq API ->
-the API returns a response -> `print()` displays it. This repeats in a loop
-until the user types `quit`.
+## Screenshots
+![Chat demo](screenshot.png)
 
 ## What I learned
-- How to call an AI model from code using an SDK
-- How to keep secrets out of Git with `.env` and `.gitignore`
-- The structure of a chat API request (model, messages) and response (choices)
+- How chat APIs work: a list of messages with `system`, `user`, `assistant` roles
+- The model has no memory; the app must resend the history every time
+- Why history must be trimmed (token limits, cost, speed)
+- Separating code into modules makes it easier to test and change
+- Never commit secrets; use `.env` + `.gitignore`
+
+## Problems and solutions
+| Problem | Solution |
+|---|---|
+| API returned `404 model_not_found` because the model was retired | Model name is now configurable via `MODEL` in `.env`, and the error message explains how to fix it |
+| App crashed on network/API errors | All API errors are caught in `client.py` and shown as friendly messages |
+| A failed request left an unanswered message in history | History rolls back the last user message on failure |
+| History grows forever | History is trimmed to the last `MAX_HISTORY_MESSAGES` messages |
+| Risk of leaking the API key | Key lives in `.env`, which is in `.gitignore`; logs never contain it |
 
 ## What I would improve next
-- Add conversation history so the bot remembers earlier messages
-- Add error handling for network/API failures
-- Add a system prompt and a simple web UI
+- Streaming responses (show text as it is generated)
+- Save/load conversations to a file
+- Web UI (Streamlit or FastAPI + React)
+- Token-based history limit instead of message count
